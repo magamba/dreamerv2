@@ -1,5 +1,6 @@
 import numpy as np
-import torch 
+import torch
+from torchnmf import nmf
 from dreamerv2.models.actor import DiscreteActionModel
 from dreamerv2.models.rssm import RSSM
 from dreamerv2.models.dense import DenseModel
@@ -75,3 +76,38 @@ class Evaluator(object):
         print('average evaluation score for model at ' + model_path + ' = ' +str(np.mean(eval_scores)))
         env.close()
         return np.mean(eval_scores)
+        
+    def activity_maximization(self, env, model_path, rank):
+        """ To Do:
+            1. Sample batch of [B,L,C,K] temporal posteriors -> rollout observation
+            2. Reshape as [B,L*K,C]
+            3. Apply NMF for r=10 to each [L*K,C] posterior sample
+            4. Compute L2 norm of each group
+            5. Highlight frames that produce highest activation for each C 
+        """
+        self.load_model(self.config, model_path)
+        eval_episode = self.config.eval_episode
+        eval_scores = []    
+        for e in range(eval_episode):
+            obs, score = env.reset(), 0
+            done = False
+            prev_rssmstate = self.RSSM._init_rssm_state(1)
+            prev_action = torch.zeros(1, self.action_size).to(self.device)
+            while not done:
+                with torch.no_grad():
+                    embed = self.ObsEncoder(torch.tensor(obs, dtype=torch.float32).unsqueeze(0).to(self.device))    
+                    _, posterior_rssm_state = self.RSSM.rssm_observe(embed, prev_action, not done, prev_rssmstate)
+                    model_state = self.RSSM.get_model_state(posterior_rssm_state)
+                    action, _ = self.ActionModel(model_state)
+                    prev_rssmstate = posterior_rssm_state
+                    prev_action = action
+                next_obs, rew, done, _ = env.step(action.squeeze(0).cpu().numpy())
+                if self.config.eval_render:
+                    env.render()
+                score += rew
+                obs = next_obs
+            eval_scores.append(score)
+        print('average evaluation score for model at ' + model_path + ' = ' +str(np.mean(eval_scores)))
+        env.close()
+        return np.mean(eval_scores)    
+    
