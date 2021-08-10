@@ -29,8 +29,8 @@ def main(args):
 
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
-    if torch.cuda.is_available() and args.device:
-        device = torch.device('cuda')
+    if torch.cuda.is_available() and args.device.startswith('cuda'):
+        device = torch.device(args.device)
         torch.cuda.manual_seed(args.seed)
     else:
         device = torch.device('cpu')

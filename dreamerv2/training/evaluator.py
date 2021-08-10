@@ -19,7 +19,7 @@ class Evaluator(object):
         self.action_size = config.action_size
 
     def load_model(self, config, model_path):
-        saved_dict = torch.load(model_path)
+        saved_dict = torch.load(model_path, map_location='cpu')
         obs_shape = config.obs_shape
         action_size = config.action_size
         deter_size = config.rssm_info['deter_size']
